@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <title>Tracciatore Acqua</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Tracciatore Acqua</h1>
+    </div>
+
+    <div class="mascot-container">
+      <img src="https://i.imgur.com/4AIQwYw.png" alt="Mascotte Goccia" id="mascot">
+    </div>
+
+    <div class="progress-container">
+      <span id="resetCounter" class="reset-button">0</span>
+      <div class="progress-bar">
+        <div id="progressFill"><span id="progressText"></span></div>
+      </div>
+      <button id="goalLabel" class="goal-button">2500</button>
+    </div>
+  </div>
+
+  <!-- Scelta quantità -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <p>Quanta acqua hai bevuto?</p>
+      <button data-amount="100">100 ml</button>
+      <button data-amount="200">200 ml</button>
+      <button data-amount="500">500 ml</button>
+    </div>
+  </div>
+
+  <script>
+    const DB_NAME = 'waterTrackerDB';
+    const DB_VERSION = 1;
+    let db;
+    let consumed = 0;
+    let goal = 2500;
+
+    const goalLabelEl = document.getElementById('goalLabel');
+    const progressFill = document.getElementById('progressFill');
+    const modal = document.getElementById('modal');
+
+    function initDB() {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore('data', { keyPath: 'id' });
+      };
+
+      request.onsuccess = (e) => {
+        db = e.target.result;
+        loadData();
+      };
+
+      request.onerror = () => console.error('Errore apertura DB');
+    }
+
+    function saveData() {
+      const tx = db.transaction('data', 'readwrite');
+      const store = tx.objectStore('data');
+      store.put({ id: 'water', consumed, goal });
+    }
+
+    function loadData() {
+      const tx = db.transaction('data', 'readonly');
+      const store = tx.objectStore('data');
+      const request = store.get('water');
+
+      request.onsuccess = () => {
+        if (request.result) {
+          consumed = request.result.consumed;
+          goal = request.result.goal;
+          goalLabelEl.textContent = goal;
+          updateProgress();
+        }
+      };
+    }
+
+function updateProgress() {
+  const percent = Math.min((consumed / goal) * 100, 100);
+  progressFill.style.width = `${percent}%`;
+  const progressText = document.getElementById('progressText');
+  progressText.textContent = consumed > 0 ? `${consumed} ml` : '';
+}
+
+
+    document.getElementById('mascot').addEventListener('click', () => {
+      modal.classList.remove('hidden');
+    });
+
+    document.querySelectorAll('.modal-content button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const amount = parseInt(btn.dataset.amount);
+        consumed += amount;
+        saveData();
+        updateProgress();
+        modal.classList.add('hidden');
+      });
+    });
+
+    goalLabelEl.addEventListener('click', () => {
+      const newGoal = prompt('Inserisci un nuovo obiettivo in ml:', goal);
+      if (newGoal && !isNaN(newGoal)) {
+        goal = parseInt(newGoal);
+        goalLabelEl.textContent = goal;
+        saveData();
+        updateProgress();
+      }
+    });
+
+    document.getElementById('resetCounter').addEventListener('click', () => {
+  if (confirm('Sei sicuro di voler azzerare il conteggio dell\'acqua?')) {
+    consumed = 0;
+    saveData();
+    updateProgress();
+  }
+});
+
+initDB();
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', sans-serif;
+      background: linear-gradient(to bottom, #aee1f9, #e0f7fa);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .header {
+      text-align: center;
+    }
+
+    .mascot-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #mascot {
+      width: 150px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    #mascot:active {
+      transform: scale(1.1);
+    }
+
+    .progress-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 25px;
+      background: #d3f3fc;
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #progressFill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 0.9em;
+      height: 100%;
+      background-color: #007aff;
+      width: 0;
+      transition: width 0.3s ease;
+    }
+
+    .goal-button {
+      background: none;
+      border: none;
+      color: #007aff;
+      font-size: 1em;
+      cursor: pointer;
+      padding: 0 10px;
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+    }
+
+    .modal-content button {
+      margin: 10px;
+      padding: 10px 20px;
+      border: none;
+      background-color: #00bcd4;
+      color: white;
+      font-size: 1em;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .hidden {
+      display: none;
+    }
+  .reset-button {
+  cursor: pointer;
+  color: #007aff;
+  font-weight: bold;
+  padding: 0 10px;
+}
+
+.reset-button:hover {
+  text-decoration: underline;
+}
+
+</style>
+</body>
+</html>
